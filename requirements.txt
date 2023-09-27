@@ -1,0 +1,9 @@
+docx
+datetime
+os
+string
+pymorphy2
+tkinter
+matplotlib
+math
+numpy
