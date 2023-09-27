@@ -1,5 +1,5 @@
 class Search:
-    all_words_togerher = False
+    all_words_together = False
     date_start_string = ""
     date_end_string = ""
     search_query = ""
