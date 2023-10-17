@@ -1,9 +1,5 @@
-docx
-datetime
-os
-string
-pymorphy2
-tkinter
-matplotlib
-math
-numpy
+nltk~=3.8.1
+pymorphy2~=0.9.1
+numpy~=1.22.3
+docx~=0.2.4
+matplotlib~=3.6.2

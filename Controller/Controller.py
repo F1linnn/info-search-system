@@ -1,5 +1,4 @@
 import nltk
-
 from Model.Model import Model
 from View.View import View
 from docx import Document
@@ -18,6 +17,8 @@ import numpy as np
 import re
 import heapq
 
+
+
 class Controller:
     def __init__(self, root):
         self.model = Model()
@@ -35,9 +36,7 @@ class Controller:
 
     def __get_synonyms(self,word):
         morph = pymorphy2.MorphAnalyzer()
-        # Получаем нормальную форму слова
         normal_form = morph.parse(word)[0].normal_form
-        # Получаем синонимы слова
         synonyms = []
         for synset in morph.parse(normal_form)[0].lexeme:
             synonyms.append(synset.word)
@@ -70,31 +69,35 @@ class Controller:
         query = self.__punctuation(query).lower()
         query = query.split()
         query_termins_synonyms = []
+
         for word in query:
             query_termins_synonyms+= list(set(self.__get_synonyms(word)))
 
         dictionary = self.model.get_dictionary()
         vector_binary_query = []
+
         for word in dictionary:
                 vector_binary_query.append(1 if word in query_termins_synonyms else 0)
-
-
 
         self.model.set_query_vector(vector_binary_query)
 
     def calculate_similar(self):
+
         matrix_docs = self.model.get_docs_vectors()
         query_vector = np.array(self.model.get_query_vector())
         e_query_vector = np.linalg.norm(query_vector)
         similar = {}
         id = 0
+
         for vector in matrix_docs:
             vec = np.array(vector)
             e_vec = np.linalg.norm(vec)
+
             if (e_vec * e_query_vector) != 0:
                 query_equals_doc = (np.dot(vec, query_vector))/(e_vec * e_query_vector)
                 similar[id]=query_equals_doc
                 id+=1
+
             else:
                 query_equals_doc = "Nan"
                 similar[id] = query_equals_doc
@@ -106,19 +109,21 @@ class Controller:
 
 
     def open_word_file(self):
+
         documents = []
         file_path = filedialog.askopenfilenames(filetypes=[("Word Files", "*.docx")])
+
         if file_path:
             for path in file_path:
+
                 doc = Document(path)
                 doc_name = os.path.basename(path)
                 doc_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
                 doc_created_date = datetime.fromtimestamp(os.path.getctime(path)).strftime('%H:%M - %d.%m.%Y').split(
                     "-")
-                # doc_modified_date = datetime.fromtimestamp(os.path.getmtime(path)).strftime('%H:%M - %d.%m.%Y').split("-")
                 document = MyDocument(doc_name, path, doc_content, doc_created_date[1], doc_created_date[0])
-
                 documents.append(document)
+
             self.model.set_documents(documents)
             self.update_log("Files uploaded")
 
@@ -139,6 +144,7 @@ class Controller:
         if not self.model.get_documents():
             messagebox.showinfo("Ошибка", "Вы не загрузили документы")
             return 0
+
         if not self.view.query_entry.get():
             messagebox.showinfo("Ошибка", "Введите языковой запрос")
             return 0
@@ -151,7 +157,8 @@ class Controller:
         if not self.check_is_nan(self.model.get_result_similar()):
             return 0
 
-        docs_id = list(self.model.get_result_similar().keys())  # Преобразовать в список, если нужно
+        docs_id = list(self.model.get_result_similar().keys())
+
         self.update_log("Наиболее подходящие документы:")
         for id in range(len(docs_id)):
             self.update_log(f"{id+1}. "+self.model.get_document_by_id(docs_id[id]).title + f": {self.model.get_result_similar()[docs_id[id]]}")
@@ -159,10 +166,8 @@ class Controller:
         self.view.show_open_files_button()
 
     def generate_annotation(self):
-        # Путь к папке с файлами
-        path = f"C:/Users/Nikit04ka/PycharmProjects/info-search-system-master/docs/"
+        path = f"../docs/"
         article_text = ""
-        # Получение выбранного файла из списка
         selected_index = self.view.listbox.curselection()
 
         if selected_index:
@@ -183,11 +188,11 @@ class Controller:
                 print(f"Произошла ошибка при чтении файла: {e}")
 
         print(article_text)
-        # Removing Square Brackets and Extra Spaces
+
         article_text = re.sub(r'\[[0-9]*\]', ' ', article_text)
         article_text = re.sub(r'\s+', ' ', article_text)
 
-        # Removing special characters and digits
+
         formatted_article_text = re.sub('[^а-яА-Я]', ' ', article_text)
         formatted_article_text = re.sub(r'\s+', ' ', formatted_article_text)
 
@@ -221,8 +226,7 @@ class Controller:
         summary_sentences = heapq.nlargest(3, sentence_scores, key=sentence_scores.get)
 
         summary = ' '.join(summary_sentences)
-        print(selected_file)
-        print(summary)
+
         self.update_log(f"\n{selected_file}: {summary}")
 
     def update_file_list(self):
@@ -232,7 +236,7 @@ class Controller:
             self.view.listbox.insert(tk.END, self.model.get_document_by_id(docs_id[id]).title)
 
     def open_new_files(self):
-        path = f"C:/Users/Nikit04ka/PycharmProjects/info-search-system-master/docs/"
+        path = f"../docs/"
         selected_index = self.view.listbox.curselection()
         if selected_index:
             selected_file = self.view.listbox.get(selected_index[0])
@@ -300,7 +304,6 @@ class Controller:
         ax.grid(True)
         ax.legend()
 
-        # Создаем виджет для встраивания графика в tkinter окно
         canvas = FigureCanvasTkAgg(fig, master=self.view.metrics_window)
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack()
@@ -310,13 +313,18 @@ class Controller:
         amount_irrelevant_docs = len(self.model.get_irrelevant_documents()) # b
         amount_bad_relevant_docs = len(self.model.get_bad_relevant_documents()) # d
         not_finded_docs = 0 # c
+
         reccal = self.recall_metric(amount_relevant_docs,not_finded_docs)
         precision = self.precision_metric(amount_relevant_docs, amount_irrelevant_docs)
+
         accuracy = self.accuracy_metric(amount_relevant_docs,amount_irrelevant_docs, not_finded_docs, amount_bad_relevant_docs)
         error = self.error_metric(amount_relevant_docs,amount_irrelevant_docs, not_finded_docs, amount_bad_relevant_docs)
+
         f_measure = self.f_measure_metric(reccal, precision)
         precision_n = self.precision_n_metric(amount_relevant_docs)
+
         r_precision = self.r_precision_metric(amount_relevant_docs)
+
         txt = f"Recall: {reccal} \n" \
               f"Precision: {precision}\n" \
               f"Average precision: {reccal}\n" \
@@ -335,23 +343,23 @@ class Controller:
         # Создайте словарь для хранения числа документов, содержащих каждый термин
         term_document_count = {}
         documents = self.model.get_documents
-        # Общее количество документов
+
         total_documents = len(documents)
         termins = []
-        # Проход по каждому документу
+
         for doc in documents:
-            # Получите уникальные термины в текущем документе
+
             unique_terms = set(doc.text.split())
 
-            # Увеличьте счетчик для каждого термина
             for term in unique_terms:
                 termins.append(term)
+
         for doc in documents:
             for term in termins:
                 if term in set(doc.text.split()):
                     term_document_count[term] = term_document_count.get(term, 0) + 1
 
-        # Рассчитайте IDF для каждого термина
+
         idf_values = {}
         for term, doc_count in term_document_count.items():
             idf = math.log(total_documents / (doc_count + 1))  # Добавляем 1, чтобы избежать деления на 0
@@ -365,13 +373,17 @@ class Controller:
         IDFS = self.model.get_IDFS()
         WTDS = []
         L_vector = []
+
         if not IDFS:
             return False
+
         for doc in documents:
             term_document_count = {}
             Li = []
+
             for key in IDFS:
                 term_document_count[key] = doc.text.count(key) * IDFS[key]
+
                 if key in doc.text:
                     Li.append(1)
                 else:
@@ -385,9 +397,6 @@ class Controller:
 
     def search_query_transformation(self, user_query):
         user_termins = set(user_query.split())
-        documents = self.model.get_documents()
-        user_termins_count_TF = {}
-        user_termins_IDF = {}
         IDFS = self.model.get_IDFS()
         query_vector = []
 

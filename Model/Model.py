@@ -77,6 +77,6 @@ class Model:
     def get_TF_IDF(self):
         return self.__TF_IDF
 
-    #Getting only termins without IDFS value.
+
     def get_termins(self):
         return [key for key in self.__IDF]
