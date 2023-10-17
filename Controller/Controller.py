@@ -1,3 +1,5 @@
+import nltk
+
 from Model.Model import Model
 from View.View import View
 from docx import Document
@@ -13,6 +15,8 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import math
 import numpy as np
+import re
+import heapq
 
 class Controller:
     def __init__(self, root):
@@ -52,13 +56,13 @@ class Controller:
         dictionary = self.model.get_dictionary()
         docs = self.model.get_documents()
         matrix_of_docs = []
-        print(len(docs), "Кол-во доков")
+
         for doc in docs:
             vector_doc = []
             for word in dictionary:
                 vector_doc.append(1 if word in doc.text else 0)
             matrix_of_docs.append(vector_doc)
-        print(*matrix_of_docs)
+
         self.model.set_docs_vectors(matrix_of_docs)
 
 
@@ -75,7 +79,7 @@ class Controller:
                 vector_binary_query.append(1 if word in query_termins_synonyms else 0)
 
 
-        print(sum(vector_binary_query))
+
         self.model.set_query_vector(vector_binary_query)
 
     def calculate_similar(self):
@@ -87,12 +91,17 @@ class Controller:
         for vector in matrix_docs:
             vec = np.array(vector)
             e_vec = np.linalg.norm(vec)
-            query_equals_doc =  (np.dot(vec, query_vector))/(e_vec * e_query_vector)
-            similar[id]=query_equals_doc
-            id+=1
+            if (e_vec * e_query_vector) != 0:
+                query_equals_doc = (np.dot(vec, query_vector))/(e_vec * e_query_vector)
+                similar[id]=query_equals_doc
+                id+=1
+            else:
+                query_equals_doc = "Nan"
+                similar[id] = query_equals_doc
+                id += 1
 
         sorted_similar = {k: v for k, v in sorted(similar.items(),reverse=True, key=lambda item: item[1])}
-        print(sorted_similar)
+
         self.model.set_result_similar(sorted_similar)
 
 
@@ -121,7 +130,7 @@ class Controller:
 
     def check_is_nan(self, similar):
         for key, value in similar.items():
-            if np.isnan(value):
+            if value == "Nan":
                 self.update_log("Совпадения не найдены.")
                 return False
             else: return True
@@ -149,6 +158,73 @@ class Controller:
 
         self.view.show_open_files_button()
 
+    def generate_annotation(self):
+        # Путь к папке с файлами
+        path = f"C:/Users/Nikit04ka/PycharmProjects/info-search-system-master/docs/"
+        article_text = ""
+        # Получение выбранного файла из списка
+        selected_index = self.view.listbox.curselection()
+
+        if selected_index:
+            selected_file = self.view.listbox.get(selected_index[0])
+            file_path = os.path.join(path, selected_file)
+            print(file_path)
+            try:
+                if file_path.endswith('.docx'):
+                    doc = Document(file_path)
+                    for paragraph in doc.paragraphs:
+                        article_text += paragraph.text + '\n'
+                elif file_path.endswith('.txt'):
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        article_text = file.read()
+                else:
+                    print("Неподдерживаемый формат файла.")
+            except Exception as e:
+                print(f"Произошла ошибка при чтении файла: {e}")
+
+        print(article_text)
+        # Removing Square Brackets and Extra Spaces
+        article_text = re.sub(r'\[[0-9]*\]', ' ', article_text)
+        article_text = re.sub(r'\s+', ' ', article_text)
+
+        # Removing special characters and digits
+        formatted_article_text = re.sub('[^а-яА-Я]', ' ', article_text)
+        formatted_article_text = re.sub(r'\s+', ' ', formatted_article_text)
+
+        sentence_list = nltk.sent_tokenize(article_text)
+
+        stopwords = nltk.corpus.stopwords.words('russian')
+
+        word_frequencies = {}
+        for word in nltk.word_tokenize(formatted_article_text):
+            if word not in stopwords:
+                if word not in word_frequencies.keys():
+                    word_frequencies[word] = 1
+                else:
+                    word_frequencies[word] += 1
+        print(word_frequencies.values())
+        maximum_frequency = max(word_frequencies.values())
+
+        for word in word_frequencies.keys():
+            word_frequencies[word] = (word_frequencies[word] / maximum_frequency)
+
+        sentence_scores = {}
+        for sent in sentence_list:
+            for word in nltk.word_tokenize(sent.lower()):
+                if word in word_frequencies.keys():
+                    if len(sent.split(' ')) < 30:
+                        if sent not in sentence_scores.keys():
+                            sentence_scores[sent] = word_frequencies[word]
+                        else:
+                            sentence_scores[sent] += word_frequencies[word]
+
+        summary_sentences = heapq.nlargest(3, sentence_scores, key=sentence_scores.get)
+
+        summary = ' '.join(summary_sentences)
+        print(selected_file)
+        print(summary)
+        self.update_log(f"\n{selected_file}: {summary}")
+
     def update_file_list(self):
         docs_id = list(self.model.get_result_similar().keys())
         self.view.listbox.delete(0, tk.END)
@@ -156,7 +232,7 @@ class Controller:
             self.view.listbox.insert(tk.END, self.model.get_document_by_id(docs_id[id]).title)
 
     def open_new_files(self):
-        path = f"C:/Users/100NOUT/PycharmProjects/info-search-system/docs/"
+        path = f"C:/Users/Nikit04ka/PycharmProjects/info-search-system-master/docs/"
         selected_index = self.view.listbox.curselection()
         if selected_index:
             selected_file = self.view.listbox.get(selected_index[0])
@@ -281,7 +357,7 @@ class Controller:
             idf = math.log(total_documents / (doc_count + 1))  # Добавляем 1, чтобы избежать деления на 0
             idf_values[term] = idf
 
-        print(idf_values)
+
         self.model.set_IDFS(idf_values)
 
     def calculated_weight_termins_and_L_vector_in_documents(self):
